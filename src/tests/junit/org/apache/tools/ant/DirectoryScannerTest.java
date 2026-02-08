@@ -29,6 +29,7 @@ import static org.junit.Assume.assumeTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -236,10 +237,7 @@ public class DirectoryScannerTest {
             assertTrue("target does not exist pre-test", targetFile.exists());
 
             try {
-                // add conditions and more commands as soon as the need arises
-                String[] command = new String[] {"ln", "-s", targetFile.getAbsolutePath(), linkFile.getAbsolutePath()};
-                Process process = Runtime.getRuntime().exec(command);
-                assertEquals("0 return code expected for external process", 0, process.waitFor());
+                Files.createSymbolicLink(linkFile.toPath(), targetFile.toPath());
 
                 // followSymlinks should be true by default, but if this ever
                 // changes we will need this line.
