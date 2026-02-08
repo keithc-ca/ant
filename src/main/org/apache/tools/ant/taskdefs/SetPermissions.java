@@ -20,6 +20,7 @@ package org.apache.tools.ant.taskdefs;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.DosFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
@@ -56,6 +57,7 @@ public class SetPermissions extends Task {
         EnumSet.noneOf(PosixFilePermission.class);
     private Resources resources = null;
     private boolean failonerror = true;
+    private boolean actOnLinkTargets = true;
     private NonPosixMode nonPosixMode = NonPosixMode.fail;
 
     /**
@@ -127,6 +129,19 @@ public class SetPermissions extends Task {
     }
 
     /**
+     * Sets whether permissions should be applied to symbolic links or
+     * Windows junctions themselves or the link's targets.
+     *
+     * <p>The default value is {@code true}.</p>
+     *
+     * @param actOnLinkTargets true if permissions of link targets should be set.
+     * @since Ant 1.10.16
+     */
+    public void setActOnLinkTarget(boolean actOnLinkTargets) {
+        this.actOnLinkTargets = actOnLinkTargets;
+    }
+
+    /**
      * Adds a collection of resources to set permissions on.
      * @param rc a resource collection
      */
@@ -147,7 +162,8 @@ public class SetPermissions extends Task {
             for (Resource r : resources) {
                 currentResource = r;
                 try {
-                    PermissionUtils.setPermissions(r, permissions, this::posixPermissionsNotSupported);
+                    PermissionUtils.setPermissions(r, permissions, actOnLinkTargets,
+                                                   this::posixPermissionsNotSupported);
                 } catch (IOException ioe) {
                     maybeThrowException(ioe, "Failed to set permissions on '%s' due to %s", r, ioe.getMessage());
                 }
@@ -199,7 +215,9 @@ public class SetPermissions extends Task {
     private void tryDos(Path p, boolean failIfDosIsNotSupported) {
         log("Falling back to DosFileAttributeView", Project.MSG_DEBUG);
         boolean readOnly = !isWritable();
-        DosFileAttributeView view = Files.getFileAttributeView(p, DosFileAttributeView.class);
+        DosFileAttributeView view = actOnLinkTargets
+            ? Files.getFileAttributeView(p, DosFileAttributeView.class)
+            : Files.getFileAttributeView(p, DosFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
         if (view != null) {
             try {
                 view.setReadOnly(readOnly);

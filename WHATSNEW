@@ -82,6 +82,11 @@ Other changes:
  * added <windowsjunction> file selector which only select directories
    that are Windows junctions.
 
+ * added a new actOnLinkTargets attribute to <setpermissions> to
+   control whether the permissions apply to a symbolic link or Windows
+   junction or the target of the respective links. The old behavior
+   of changing the link's target remains as default.
+
 Changes from Ant 1.10.14 TO Ant 1.10.15
 =======================================
 

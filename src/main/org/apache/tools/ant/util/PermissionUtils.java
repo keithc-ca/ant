@@ -103,6 +103,10 @@ public class PermissionUtils {
      *  <li>{@link ArchiveResource}</li>
      * </ul>
      *
+     * <p>When applied to a {@code FileProvider} providing a symbolic
+     * link or Windows junction, the permission of the link target are
+     * set, not the permssions of the link itself.</p>
+     *
      * @param r the resource to set permissions for
      * @param permissions the permissions
      * @param posixNotSupportedCallback optional callback that is
@@ -114,11 +118,42 @@ public class PermissionUtils {
     public static void setPermissions(Resource r, Set<PosixFilePermission> permissions,
                                       Consumer<Path> posixNotSupportedCallback)
         throws IOException {
+        setPermissions(r, permissions, true, posixNotSupportedCallback);
+    }
+
+    /**
+     * Sets permissions on a {@link Resource} - doesn't do anything
+     * for unsupported resource types.
+     *
+     * <p>Supported types are:</p>
+     * <ul>
+     *  <li>any {@link FileProvider}</li>
+     *  <li>{@link ArchiveResource}</li>
+     * </ul>
+     *
+     * @param r the resource to set permissions for
+     * @param permissions the permissions
+     * @param actOnLinkTarget whether to set the permissions on a
+     * symbolic link or Windows junction itself instead of the link's
+     * target. Only applies to resources that are {@code
+     * FileProvider}s.
+     * @param posixNotSupportedCallback optional callback that is
+     * invoked for a file provider resource if the file-system holding
+     * the file doesn't support PosixFilePermissions. The Path
+     * corresponding to the file is passed to the callback.
+     * @throws IOException if something goes wrong
+     * @since Ant 1.10.16
+     */
+    public static void setPermissions(Resource r, Set<PosixFilePermission> permissions,
+                                      boolean actOnLinkTarget,
+                                      Consumer<Path> posixNotSupportedCallback)
+        throws IOException {
         FileProvider f = r.as(FileProvider.class);
         if (f != null) {
             Path p = f.getFile().toPath();
-            PosixFileAttributeView view =
-                Files.getFileAttributeView(p, PosixFileAttributeView.class);
+            PosixFileAttributeView view = actOnLinkTarget
+                ? Files.getFileAttributeView(p, PosixFileAttributeView.class)
+                : Files.getFileAttributeView(p, PosixFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
             if (view != null) {
                 view.setPermissions(permissions);
             } else if (posixNotSupportedCallback != null) {
@@ -131,7 +166,7 @@ public class PermissionUtils {
     }
 
     /**
-     * Sets permissions of a {@link Resource} - returns an empty set
+     * Reads permissions of a {@link Resource} - returns an empty set
      * for unsupported resource types or file systems that don't
      * support PosixFilePermissions and no fallback has been
      * provided..
@@ -141,6 +176,10 @@ public class PermissionUtils {
      *  <li>any {@link FileProvider}</li>
      *  <li>{@link ArchiveResource}</li>
      * </ul>
+     *
+     * <p>When applied to a {@code FileProvider} providing a symbolic
+     * link or Windows junction, the permission of the link target are
+     * read, not the permssions of the link itself.</p>
      *
      * @param r the resource to read permissions from
      * @param posixNotSupportedFallback optional fallback function to provide
@@ -153,11 +192,44 @@ public class PermissionUtils {
     public static Set<PosixFilePermission> getPermissions(Resource r,
             Function<Path, Set<PosixFilePermission>> posixNotSupportedFallback)
         throws IOException {
+        return getPermissions(r, true, posixNotSupportedFallback);
+    }
+
+    /**
+     * Reads permissions of a {@link Resource} - returns an empty set
+     * for unsupported resource types or file systems that don't
+     * support PosixFilePermissions and no fallback has been
+     * provided..
+     *
+     * <p>Supported types are:</p>
+     * <ul>
+     *  <li>any {@link FileProvider}</li>
+     *  <li>{@link ArchiveResource}</li>
+     * </ul>
+     *
+     * @param r the resource to read permissions from
+     * @param readFromLinkTarget whether to read the permissions of a
+     * symbolic link or Windows junction itself instead of the link's
+     * target. Only applies to resources that are {@code
+     * FileProvider}s.
+     * @param posixNotSupportedFallback optional fallback function to provide
+     * permissions for file system that don't support
+     * PosixFilePermissions. The Path corresponding to the file is
+     * passed to the callback.
+     * @return the permissions
+     * @throws IOException if something goes wrong
+     * @sine Ant 1.10.16
+     */
+    public static Set<PosixFilePermission> getPermissions(Resource r,
+            boolean readFromLinkTarget,
+            Function<Path, Set<PosixFilePermission>> posixNotSupportedFallback)
+        throws IOException {
         FileProvider f = r.as(FileProvider.class);
         if (f != null) {
             Path p = f.getFile().toPath();
-            PosixFileAttributeView view =
-                Files.getFileAttributeView(p, PosixFileAttributeView.class);
+            PosixFileAttributeView view = readFromLinkTarget
+                ? Files.getFileAttributeView(p, PosixFileAttributeView.class)
+                : Files.getFileAttributeView(p, PosixFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
             if (view != null) {
                 return view.readAttributes().permissions();
             } else if (posixNotSupportedFallback != null) {
